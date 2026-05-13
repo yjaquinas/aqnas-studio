@@ -1,0 +1,40 @@
+<doc xmlns="https://hyperview.org/hyperview">
+  <screen>
+    <styles>
+      <style id="body" flex="1" backgroundColor="#F8FAFC" padding="16" />
+      <style id="label" fontSize="12" fontWeight="700" color="#94A3B8" marginBottom="4" textTransform="uppercase" letterSpacing="1" />
+      <style id="input" borderWidth="1" borderColor="#94A3B8" borderRadius="6" padding="12" fontSize="16" marginBottom="16" backgroundColor="#F8FAFC" color="#0F172A" />
+      <style id="input-multiline" borderWidth="1" borderColor="#94A3B8" borderRadius="6" padding="12" fontSize="16" marginBottom="16" backgroundColor="#F8FAFC" color="#0F172A" minHeight="120" />
+      <style id="submit" padding="12" backgroundColor="#0F172A" borderRadius="6" marginTop="8" />
+      <style id="submit-text" color="#F8FAFC" fontWeight="700" textAlign="center" />
+    </styles>
+    <body style="body">
+      <form>
+        <text style="label">Title</text>
+        <text-field
+          name="title"
+          style="input"
+          placeholder="Notice the gap"
+        />
+
+        <text style="label">Body</text>
+        <text-field
+          name="body"
+          style="input-multiline"
+          placeholder="Describe the problem..."
+          multiline="true"
+        />
+
+        <view style="submit">
+          <behavior
+            trigger="press"
+            action="navigate"
+            href="/m/posts"
+            verb="post"
+          />
+          <text style="submit-text">Submit</text>
+        </view>
+      </form>
+    </body>
+  </screen>
+</doc>

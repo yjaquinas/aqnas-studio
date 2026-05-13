@@ -1,0 +1,31 @@
+# AQNAS port registry — TEMPLATE
+#
+# This file is a template. Your real allocations live in `ports.conf` (which is
+# gitignored). On first run of setup.sh or allocate-port.sh, this template is
+# copied to `ports.conf` if one doesn't exist yet.
+#
+# Why split: the studio repo is public; specific port allocations are operational
+# state that doesn't need to be public.
+#
+# Format: {project} = {port}
+# Range: 8000–8099 (see the port-registry skill)
+#
+# Sub-ranges:
+#   8000–8009 — studio infrastructure (reserved for future)
+#   8010–8089 — normal projects (allocate here)
+#   8090–8099 — temporary/scratch projects
+#
+# To reserve a port, run:
+#   $AQNAS_STUDIO_ROOT/claude-config/skills/port-registry/scripts/allocate-port.sh {project}
+# (allocate-port.sh appends atomically with flock)
+
+# Studio infrastructure (8000–8009)
+# (none yet)
+
+# Projects (8010–8089)
+# e.g.
+# my-first-app = 8010
+# my-second-app = 8011
+
+# Scratch (8090–8099)
+# (none)

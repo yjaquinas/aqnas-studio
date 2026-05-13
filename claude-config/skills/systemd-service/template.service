@@ -1,0 +1,27 @@
+[Unit]
+Description={Project Display Name} ({project-domain})
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User={project}
+Group={project}
+WorkingDirectory=/opt/{project}/{project}
+EnvironmentFile=/opt/{project}/.env
+Environment=UV_CACHE_DIR=/opt/{project}/.uv-cache
+ExecStart=/usr/local/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port {port} --workers 2
+Restart=on-failure
+RestartSec=3
+
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/opt/{project}/data /opt/{project}/.uv-cache
+ReadOnlyPaths=/opt/{project}
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

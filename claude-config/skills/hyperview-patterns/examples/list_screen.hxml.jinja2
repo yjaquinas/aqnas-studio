@@ -1,0 +1,38 @@
+<doc xmlns="https://hyperview.org/hyperview">
+  <screen>
+    <styles>
+      <style id="body" flex="1" backgroundColor="#F8FAFC" />
+      <style id="header" padding="16" borderBottomWidth="1" borderColor="#94A3B8" />
+      <style id="title" fontSize="20" fontWeight="700" color="#0F172A" />
+      <style id="item" padding="16" borderBottomWidth="1" borderColor="#94A3B8" />
+      <style id="item-title" fontSize="16" fontWeight="500" color="#0F172A" />
+      <style id="item-meta" fontSize="12" color="#94A3B8" marginTop="4" />
+      <style id="empty" padding="32" textAlign="center" color="#94A3B8" />
+    </styles>
+    <body style="body">
+      <behavior trigger="refresh" action="reload" />
+
+      <view style="header">
+        <text style="title">{{ title }}</text>
+      </view>
+
+      <list>
+        {% for post in posts %}
+        <item key="{{ post.id }}" style="item">
+          <behavior
+            trigger="press"
+            action="navigate"
+            href="/m/posts/{{ post.id }}"
+          />
+          <text style="item-title">{{ post.title }}</text>
+          <text style="item-meta">{{ post.created_at }}</text>
+        </item>
+        {% else %}
+        <item style="empty">
+          <text style="empty">No posts yet.</text>
+        </item>
+        {% endfor %}
+      </list>
+    </body>
+  </screen>
+</doc>

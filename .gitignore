@@ -1,0 +1,55 @@
+# Studio-wide meetings — private strategy work, never committed
+meetings/*
+!meetings/.gitkeep
+
+# Claude Code runtime state — generated as you work, not part of the studio
+# The studio tracks methodology (CLAUDE.md, agents/, skills/), not the running state.
+# Anyone cloning gets the same methodology; their runtime state will be their own.
+claude-config/.credentials.json
+claude-config/history.jsonl
+claude-config/projects/
+claude-config/file-history/
+claude-config/backups/
+claude-config/cache/
+claude-config/mcp-needs-auth-cache.json
+claude-config/*.backup
+claude-config/*.backup.*
+claude-config/__store.db*
+claude-config/todos/
+claude-config/statsig/
+claude-config/ide/
+
+# Operational state — your real port allocations stay private
+# The .example template ships in the repo
+infrastructure/server/ports.conf
+# flock's lockfile — transient state, not source data
+infrastructure/server/ports.conf.lock
+
+# Environment files (should never appear in this repo, but enforce anyway)
+.env
+.env.local
+*.env
+!.env.example
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python (in case any studio scripts generate these)
+__pycache__/
+*.py[cod]
+.venv/
+
+# uv
+.uv-cache/
+
+# Node (in case mobile tooling runs here)
+node_modules/

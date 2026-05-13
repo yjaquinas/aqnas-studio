@@ -1,0 +1,28 @@
+<doc xmlns="https://hyperview.org/hyperview">
+  <screen>
+    <styles>
+      <style id="body" flex="1" backgroundColor="#F8FAFC" />
+      <style id="header" padding="16" flexDirection="row" alignItems="center" borderBottomWidth="1" borderColor="#94A3B8" />
+      <style id="back" paddingRight="12" />
+      <style id="back-text" color="#E34234" fontWeight="700" />
+      <style id="content" padding="16" />
+      <style id="title" fontSize="24" fontWeight="700" color="#0F172A" marginBottom="8" />
+      <style id="meta" fontSize="12" color="#94A3B8" marginBottom="16" />
+      <style id="body-text" fontSize="16" color="#0F172A" lineHeight="24" />
+    </styles>
+    <body style="body">
+      <view style="header">
+        <view style="back">
+          <behavior trigger="press" action="back" />
+          <text style="back-text">← Back</text>
+        </view>
+      </view>
+
+      <view style="content">
+        <text style="title">{{ post.title }}</text>
+        <text style="meta">{{ post.created_at }}</text>
+        <text style="body-text">{{ post.body }}</text>
+      </view>
+    </body>
+  </screen>
+</doc>
