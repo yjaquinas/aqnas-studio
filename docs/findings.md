@@ -357,3 +357,67 @@ used_ports=$(grep -v '^\s*#' "$REGISTRY" | grep -oE '=\s*8[0-9]{3}' | grep -oE '
 ```
 
 **Verified:** Re-ran the chunk 5 smoke test — fresh registry from `.example` allocated 8010 for first project (correct, ignoring commented `# my-first-app = 8010`), 8011 for second project, refused duplicate. Three smoke tests passed.
+
+---
+
+## Bug 15 — Studio repo accidentally captures Claude Code runtime state
+
+**Found:** 2026-05-13 (during Phase 6 init commit prep)
+**Severity:** High — `.credentials.json` (Claude Code auth token) would have been pushed publicly if not caught. Cross-session chat history (`history.jsonl`, `projects/`) would also have been exposed, leaking commands, code excerpts, and conversation content.
+**Where:** Studio root `.gitignore`.
+
+The studio's design symlinks `~/.claude/` to `aqnas-studio/claude-config/`. The intent: `claude-config/` is the source of truth for studio methodology (`CLAUDE.md`, `agents/`, `skills/`), and the symlink lets Claude Code read it the way it expects.
+
+**The gap:** Claude Code doesn't only *read* from `~/.claude/`. It also *writes* runtime state there — auth tokens, chat history, per-project conversation logs, file-edit snapshots, config backups, caches. By making `claude-config/` the symlink target, the studio inadvertently captures all of that.
+
+When the initial `git add .` ran during Phase 6, the following were all staged:
+
+| Path | What it is | Severity |
+|---|---|---|
+| `claude-config/.credentials.json` | Claude Code auth token (470 bytes, mode 600) | **Critical** — live credential |
+| `claude-config/history.jsonl` | Cross-session chat history | High — conversation content |
+| `claude-config/projects/-home-aquinas-hello-aqnas/*.jsonl` (4 files) | Per-project session logs, 255+ conversation turns in the main file (484KB) | High — commands, code, errors, possibly secrets mentioned in chat |
+| `claude-config/file-history/.../@v2` (~50 files) | File edit snapshots Claude Code keeps | Medium — code in flight |
+| `claude-config/backups/.claude.json.backup.*` (5 files) | Backups of Claude's master config | Medium — may contain MCP server URLs with credentials |
+| `claude-config/cache/changelog.md` | Runtime cache | Low — not source data |
+| `claude-config/mcp-needs-auth-cache.json` | MCP auth state | Low — auth state references, no values |
+| `infrastructure/server/ports.conf.lock` | flock's transient lockfile | Low — empty file, not data |
+
+The conceptual gap: the studio uses one directory to mean two things — methodology (tracked) and runtime state (not tracked). The gitignore is what enforces the distinction. Without it, the distinction doesn't exist.
+
+### Resolution
+
+**Date:** 2026-05-13 (immediate fix during Phase 6)
+**Change:** Added 12 new entries to root `.gitignore` covering all observed runtime-state paths plus three defensive entries (`todos/`, `statsig/`, `ide/`) for Claude Code state Anthropic might write to in future versions.
+
+```gitignore
+# Claude Code runtime state — generated as you work, not part of the studio
+# The studio tracks methodology (CLAUDE.md, agents/, skills/), not the running state.
+# Anyone cloning gets the same methodology; their runtime state will be their own.
+claude-config/.credentials.json
+claude-config/history.jsonl
+claude-config/projects/
+claude-config/file-history/
+claude-config/backups/
+claude-config/cache/
+claude-config/mcp-needs-auth-cache.json
+claude-config/*.backup
+claude-config/*.backup.*
+claude-config/__store.db*
+claude-config/todos/
+claude-config/statsig/
+claude-config/ide/
+
+# flock's lockfile — transient state, not source data
+infrastructure/server/ports.conf.lock
+```
+
+**`claude-config/settings.json` was kept tracked** — confirmed it contains only `{"theme": "dark-ansi"}` (UI preference). Inspecting the file before deciding was important; settings.json on other Claude Code installs may contain credentials.
+
+**Verified:** Pre-commit scans before pushing to GitHub:
+1. `git status --short | wc -l` returned 58 — consistent with the methodology-only file count, not the 100+ that included runtime state
+2. Targeted greps for `credentials|history\.jsonl|projects/|file-history|backups/|cache/|\.lock|mcp-needs-auth|store\.db` against the staged file list returned empty
+3. Post-commit secret scans (`grep -iE 'BEGIN.*PRIVATE.*KEY|cfut_|ghp_|sk-|xoxb-'` and IP-address scan) returned only documentation mentions in the `secret-hygiene` skill body — no live credentials
+4. Post-push spot check on the rendered GitHub repo confirmed `claude-config/projects/`, `backups/`, `.credentials.json`, etc., are not visible
+
+**Knock-on observation for future studio users:** anyone adopting this `~/.claude/ → claude-config/` symlink pattern will hit the same gap unless they apply the same gitignore. Consider mentioning the symlink-runtime-state distinction in the README's Setup section, so future-you (or anyone forking this) doesn't accidentally commit credentials on day one.
