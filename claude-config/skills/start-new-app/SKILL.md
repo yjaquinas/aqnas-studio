@@ -91,6 +91,11 @@ Always copied (regardless of flags):
 - `app/main.py` → `app/main.py`
 - `pyproject.toml` → `pyproject.toml`
 - `README.md` → `README.md`
+- `CLAUDE.md` → `CLAUDE.md` (project-root level — distinct from `.claude/CLAUDE.md`)
+- `DEVELOPER_GUIDE.md` → `DEVELOPER_GUIDE.md`
+- `run.sh` → `run.sh` (top-level local-dev runner; `chmod +x` after copy)
+- `deploy/run.sh` → `deploy/run.sh` (canonical deploy entry point; `chmod +x` after copy)
+- `infra/.gitkeep` → `infra/.gitkeep` (placeholder so directory exists)
 - `.github/workflows/deploy.yml` → `.github/workflows/deploy.yml`
 - `.claude/CLAUDE.md` → `.claude/CLAUDE.md`
 - `.claude/skills/README.md` → `.claude/skills/README.md`
@@ -113,10 +118,10 @@ Always copied:
 
 **Generated from skill templates:**
 
-- `deploy/{project-name}.service` from `$AQNAS_STUDIO_ROOT/claude-config/skills/systemd-service/template.service`
-- `deploy/{project-name}.caddy` from `$AQNAS_STUDIO_ROOT/claude-config/skills/caddy-config/template.caddy`
+- `infra/{project-name}.service` from `$AQNAS_STUDIO_ROOT/claude-config/skills/systemd-service/template.service`
+- `infra/{project-name}.caddy` from `$AQNAS_STUDIO_ROOT/claude-config/skills/caddy-config/template.caddy`
 
-The project's `deploy/` directory holds only the per-project unit and Caddy config — no `bootstrap.sh`. Server-side bootstrap is handled by the studio-level scripts at `$AQNAS_STUDIO_ROOT/infrastructure/server/scripts/`, not per-project. The generated `MANUAL-TASKS.md` references those scripts.
+The `infra/` directory holds declarative infrastructure config (systemd unit, Caddy config) plus any per-project operational scripts the project adds later (backup.sh, harden.sh, etc.). The `deploy/` directory holds only `run.sh` — the deploy entry point called by GitHub Actions. Server-side bootstrap (installing the systemd unit and Caddy config to `/etc/`) is handled by the studio-level `bootstrap-project.sh`, not per-project. The generated `MANUAL-TASKS.md` references that script.
 
 **Skeleton directories created (with `__init__.py` or `.gitkeep` as appropriate):**
 
@@ -128,7 +133,7 @@ app/routes/mobile.py                 # if mobile layer is on
 app/models/__init__.py
 app/models/db.py                     # SQLite setup stub
 app/services/__init__.py
-app/static/css/.gitkeep
+app/static/src/.gitkeep              # Tailwind v4 source dir (input.css added when Tailwind is used)
 app/static/js/.gitkeep
 app/static/img/.gitkeep
 app/templates/web/base.html.jinja2   # if web layer is on
@@ -142,6 +147,8 @@ meetings/.gitkeep
 .claude/agents/.gitkeep
 .claude/skills/.gitkeep
 ```
+
+(`deploy/run.sh` and `infra/.gitkeep` are copied from templates as listed above, so the `deploy/` and `infra/` directories will exist post-scaffold.)
 
 ## Step 5 — Initialize git
 

@@ -173,8 +173,14 @@ run "chmod 2775 '$REPO_DIR'"
 run "chmod 2775 '$PROJECT_DIR/.uv-cache'"
 
 # ============================================================
-step "6/13 Cloning repo as deploy, then chowning to service user..."
+step "6/13 Cloning repo as deploy..."
 # ============================================================
+# Clone as the deploy user (whose SSH key is already on GitHub from init-server.sh).
+# The directory is owned by {project}:{project} (step 4) with setgid set (step 5),
+# so cloned files end up owned by deploy:{project} — group inheritance via setgid.
+# The service user has group read/execute access; deploy retains write. The eventual
+# steady state after subsequent `git reset --hard` runs in deploy/run.sh matches
+# this layout exactly (no ownership flip-flopping).
 
 GITHUB_REPO="git@github.com:yjaquinas/$PROJECT.git"
 info "Repo URL: $GITHUB_REPO"
@@ -186,18 +192,21 @@ if [[ $DRY_RUN -eq 0 ]]; then
         fail "  - deploy user doesn't have access (register its public key)"
         die "Aborting"
     fi
-    chown -R "$PROJECT":"$PROJECT" "$REPO_DIR"
 else
     info "[dry-run] sudo -u deploy git clone $GITHUB_REPO $REPO_DIR"
-    info "[dry-run] chown -R $PROJECT:$PROJECT $REPO_DIR"
 fi
 
 # ============================================================
-step "7/13 Adding git safe.directory exception for deploy..."
+step "7/13 Adding git safe.directory exceptions..."
 # ============================================================
-# Without this, `git fetch` as deploy fails with "dubious ownership" because
-# .git/ is owned by the service user, not deploy. (CVE-2022-24765 mitigation.)
+# Without these, git refuses to operate with "dubious ownership". The .git/
+# directory ends up owned by deploy:{project} due to setgid, but neither deploy
+# nor the service user is the strict owner of every file (CVE-2022-24765 check).
+# Both need the exception:
+#   - deploy: runs git fetch + reset --hard via deploy/run.sh on every deploy
+#   - service user: any manual `sudo -u {project} git ...` operation needs it too
 run "sudo -u deploy git config --global --add safe.directory '$REPO_DIR'"
+run "sudo -u '$PROJECT' git config --global --add safe.directory '$REPO_DIR'"
 
 # ============================================================
 step "8/13 Generating stub .env..."
@@ -230,7 +239,7 @@ fi
 step "9/13 Installing systemd unit..."
 # ============================================================
 
-SYSTEMD_SRC="$REPO_DIR/deploy/$PROJECT.service"
+SYSTEMD_SRC="$REPO_DIR/infra/$PROJECT.service"
 SYSTEMD_DST="/etc/systemd/system/$PROJECT.service"
 
 if [[ ! -f "$SYSTEMD_SRC" ]]; then
@@ -245,7 +254,7 @@ run "systemctl enable '$PROJECT'"
 step "10/13 Installing Caddy config..."
 # ============================================================
 
-CADDY_SRC="$REPO_DIR/deploy/$PROJECT.caddy"
+CADDY_SRC="$REPO_DIR/infra/$PROJECT.caddy"
 CADDY_DST="/etc/caddy/conf.d/$PROJECT.caddy"
 
 if [[ ! -f "$CADDY_SRC" ]]; then

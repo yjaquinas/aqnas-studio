@@ -143,12 +143,14 @@ else
     TMP_FILE=$(mktemp)
     cat > "$TMP_FILE" <<'EOF'
 # Managed by aqnas-studio.
-# Grants the deploy user passwordless sudo for systemctl operations needed by CI/CD.
-# Wildcards cover all current and future projects without per-project entries.
+# Grants the deploy user passwordless sudo for systemctl operations and the
+# Caddy config sync needed by CI/CD. Wildcards cover all current and future
+# projects without per-project entries.
 
 deploy ALL=(root) NOPASSWD: /bin/systemctl restart *
 deploy ALL=(root) NOPASSWD: /bin/systemctl reload caddy
 deploy ALL=(root) NOPASSWD: /bin/systemctl status *
+deploy ALL=(root) NOPASSWD: /bin/cp /opt/*/?*/infra/*.caddy /etc/caddy/conf.d/*.caddy
 EOF
 
     # Validate via visudo before moving into place — bad sudoers can lock out sudo

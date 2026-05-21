@@ -1,0 +1,196 @@
+#!/bin/bash
+# studio-status — one-shot status of all AQNAS studio projects on this host.
+#
+# Reads /etc/caddy/ports.conf as the source of truth for "which projects exist."
+# For each project, reports: systemd state + uptime, /health endpoint, Caddy
+# config drift between repo's infra/ and /etc/caddy/conf.d/, last git commit.
+# Also reports overall Caddy daemon status and port-registry-vs-listener alignment.
+#
+# Run on the production host. Most checks are read-only and work without sudo.
+# Suggested alias for convenience:
+#   alias studio-status='~/aqnas-studio/infrastructure/server/scripts/studio-status'
+#
+# Exit code is always 0 — this is a status tool, not a CI gate. Grep the output
+# for "⚠" or "✗" to detect issues programmatically.
+
+set -uo pipefail
+
+# ── Configuration (overridable via env vars) ─────────────────────────────
+PORTS_CONF="${PORTS_CONF:-/etc/caddy/ports.conf}"
+CADDY_DIR="${CADDY_DIR:-/etc/caddy/conf.d}"
+OPT_BASE="${OPT_BASE:-/opt}"
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-5}"
+
+# ── Help ─────────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    sed -n '2,15p' "$0" | sed 's/^# //; s/^#$//'
+    exit 0
+fi
+
+# ── Color setup (auto-disable for non-TTY) ───────────────────────────────
+if [[ -t 1 ]]; then
+    G='\033[0;32m'; Y='\033[0;33m'; R='\033[0;31m'
+    D='\033[0;90m'; B='\033[1m';    N='\033[0m'
+else
+    G=''; Y=''; R=''; D=''; B=''; N=''
+fi
+
+ok()    { printf "  ${G}●${N} %s\n" "$*"; }
+warn()  { printf "  ${Y}⚠${N} %s\n" "$*"; }
+fail()  { printf "  ${R}✗${N} %s\n" "$*"; }
+info()  { printf "  ${D}·${N} %s\n" "$*"; }
+hdr()   { printf "\n${B}%s${N}\n" "$*"; }
+
+# ── Helpers ──────────────────────────────────────────────────────────────
+
+# Output "project=port" lines from ports.conf, skipping comments and blanks
+read_ports() {
+    [[ -f "$PORTS_CONF" ]] || return 0
+    grep -vE '^\s*(#|$)' "$PORTS_CONF" 2>/dev/null | tr -d ' '
+}
+
+# Extract the domain(s) from a Caddy config file's first non-comment line.
+# Caddy site blocks look like "domain.tld {" or "a.com, b.com {".
+extract_caddy_domain() {
+    local file="$1"
+    [[ -f "$file" ]] || { echo ""; return; }
+    grep -m1 -vE '^\s*(#|$)' "$file" 2>/dev/null \
+        | sed 's/{.*//' \
+        | xargs
+}
+
+# Human-readable elapsed time from an ISO-like systemd timestamp
+# (e.g. "Sun 2026-05-18 09:23:11 UTC")
+# Returns something like "2d 8h ago" or "45m ago"
+relative_time() {
+    local ts="$1"
+    [[ -z "$ts" || "$ts" == "n/a" ]] && { echo ""; return; }
+    local now_epoch ts_epoch diff
+    now_epoch=$(date +%s)
+    ts_epoch=$(date -d "$ts" +%s 2>/dev/null) || { echo ""; return; }
+    diff=$((now_epoch - ts_epoch))
+    if   (( diff < 60     )); then echo "${diff}s ago"
+    elif (( diff < 3600   )); then echo "$((diff/60))m ago"
+    elif (( diff < 86400  )); then echo "$((diff/3600))h $((diff%3600/60))m ago"
+    else                            echo "$((diff/86400))d $((diff%86400/3600))h ago"
+    fi
+}
+
+# Per-project status block
+check_project() {
+    local project="$1" port="$2"
+    local app_dir="$OPT_BASE/$project/$project"
+    local live_caddy="$CADDY_DIR/$project.caddy"
+    local repo_caddy="$app_dir/infra/$project.caddy"
+    local domain
+    domain=$(extract_caddy_domain "$live_caddy")
+
+    printf "\n${B}[%s]${N}  port %s  %s\n" \
+        "$project" "$port" "${domain:-(domain unknown)}"
+
+    # 1. systemd state
+    local state since rel
+    state=$(systemctl is-active "$project" 2>/dev/null || true)
+    case "$state" in
+        active)
+            since=$(systemctl show -p ActiveEnterTimestamp --value "$project" 2>/dev/null)
+            rel=$(relative_time "$since")
+            ok "active since ${since:-?} ${rel:+($rel)}"
+            ;;
+        inactive)
+            since=$(systemctl show -p InactiveEnterTimestamp --value "$project" 2>/dev/null)
+            rel=$(relative_time "$since")
+            fail "inactive since ${since:-?} ${rel:+($rel)}"
+            info "(skipping service-dependent checks)"
+            ;;
+        failed)
+            fail "FAILED — check: journalctl -u $project -n 50"
+            info "(skipping service-dependent checks)"
+            ;;
+        *)
+            warn "service state: ${state:-not-installed}"
+            ;;
+    esac
+
+    # If service isn't active, skip /health (would just time out)
+    if [[ "$state" == "active" ]]; then
+        local http_code
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time "$HEALTH_TIMEOUT" \
+            "http://127.0.0.1:$port/health" 2>/dev/null || echo "000")
+        if [[ "$http_code" == "200" ]]; then
+            ok "/health → 200 OK"
+        else
+            fail "/health → HTTP $http_code"
+        fi
+    fi
+
+    # 2. Caddy config drift (live in /etc/ vs repo's infra/)
+    if [[ -f "$live_caddy" && -f "$repo_caddy" ]]; then
+        if diff -q "$repo_caddy" "$live_caddy" >/dev/null 2>&1; then
+            ok "Caddy config in sync with infra/"
+        else
+            warn "Caddy config drift: $live_caddy differs from $repo_caddy"
+            info "    diff: sudo diff $repo_caddy $live_caddy"
+        fi
+    elif [[ ! -f "$repo_caddy" && -f "$live_caddy" ]]; then
+        warn "no repo Caddy at infra/$project.caddy (drift undetectable)"
+    elif [[ -f "$repo_caddy" && ! -f "$live_caddy" ]]; then
+        fail "live Caddy missing at $live_caddy"
+    fi
+    # (Both missing = silent — project may legitimately have no Caddy site)
+
+    # 3. Last commit (safe.directory='*' bypasses CVE-2022-24765 check for this read)
+    if [[ -d "$app_dir/.git" ]]; then
+        local commit
+        commit=$(git -c safe.directory='*' -C "$app_dir" log -1 \
+                     --format='%h  %ar  %s' 2>/dev/null || true)
+        if [[ -n "$commit" ]]; then
+            info "HEAD: $commit"
+        fi
+    elif [[ -d "$app_dir" ]]; then
+        info "no .git/ at $app_dir"
+    else
+        info "no repo at $app_dir"
+    fi
+}
+
+# ── Main ─────────────────────────────────────────────────────────────────
+
+printf "${B}═══ aqnas-studio status — %s ═══${N}\n" "$(hostname)"
+printf "Time: %s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# Caddy daemon
+hdr "Caddy daemon"
+caddy_state=$(systemctl is-active caddy 2>/dev/null || true)
+case "$caddy_state" in
+    active)   ok "active" ;;
+    failed)   fail "FAILED — check: journalctl -u caddy -n 50" ;;
+    inactive) fail "inactive — caddy is down" ;;
+    *)        warn "state: ${caddy_state:-not-installed}" ;;
+esac
+
+# Per-project
+hdr "Projects (from $PORTS_CONF)"
+project_count=0
+while IFS='=' read -r project port; do
+    [[ -z "${project:-}" ]] && continue
+    project_count=$((project_count + 1))
+    check_project "$project" "$port"
+done < <(read_ports)
+
+if [[ $project_count -eq 0 ]]; then
+    warn "no projects in $PORTS_CONF"
+fi
+
+# Port registry alignment
+hdr "Port registry alignment"
+while IFS='=' read -r project port; do
+    [[ -z "${project:-}" ]] && continue
+    if ss -tlnp 2>/dev/null | grep -q ":$port "; then
+        ok "$project=$port  listening"
+    else
+        warn "$project=$port  NOT listening"
+    fi
+done < <(read_ports)
+
+echo

@@ -421,3 +421,115 @@ infrastructure/server/ports.conf.lock
 4. Post-push spot check on the rendered GitHub repo confirmed `claude-config/projects/`, `backups/`, `.credentials.json`, etc., are not visible
 
 **Knock-on observation for future studio users:** anyone adopting this `~/.claude/ → claude-config/` symlink pattern will hit the same gap unless they apply the same gitignore. Consider mentioning the symlink-runtime-state distinction in the README's Setup section, so future-you (or anyone forking this) doesn't accidentally commit credentials on day one.
+
+---
+
+## Bug 16 — aqnas-xyz's `CLAUDE.md` and `DEVELOPER_GUIDE.md` reference pre-migration paths
+
+**Found:** 2026-05-20
+**Severity:** Low. Documentation drift, not operational impact. The files describe pre-migration deploy state — an AI agent reading them might propose changes against stale paths.
+**Where:** `aqnas-xyz` repo: `/CLAUDE.md`, `/DEVELOPER_GUIDE.md`.
+
+During the studio migration follow-up review (chunks A-D), the aqnas-xyz project's own root-level docs were inspected as reference content for the new studio templates. They reference pre-migration state at several spots:
+
+- `deploy.sh` (renamed to `deploy/run.sh` during migration)
+- `/opt/aqnas/app/` (now `/opt/aqnas-xyz/aqnas-xyz/`)
+- `SERVER_HOST` and `DEPLOY_KEY` GitHub secrets (renamed to `SSH_HOST` and `SSH_PRIVATE_KEY`)
+
+Why it didn't break anything: production state is correct; only the human-readable docs are stale. CI/CD reads YAML files, not Markdown.
+
+### Resolution
+
+**Date:** 2026-05-20 (logged; fix is in aqnas-xyz repo, not studio)
+**Change:** Update aqnas-xyz's root `CLAUDE.md` and `DEVELOPER_GUIDE.md` to match post-migration reality. Use the studio's new templates from `claude-config/skills/project-scaffold/templates/` (chunk B) as the reference. Specifically replace: `deploy.sh` → `deploy/run.sh`; `/opt/aqnas/app/` → `/opt/aqnas-xyz/aqnas-xyz/`; `SERVER_HOST` → `SSH_HOST`; `DEPLOY_KEY` → `SSH_PRIVATE_KEY`.
+**Status:** Deferred (separate session, aqnas-xyz repo).
+
+---
+
+## Bug 17 — kumdo-exam's Caddy config not named per studio convention
+
+**Found:** 2026-05-20
+**Severity:** Low. Currently no operational impact — kumdo-exam's `deploy/run.sh` doesn't include a Caddy sync step. Becomes blocking the moment that step is added.
+**Where:** `kumdo-exam` repo: `infra/Caddyfile` (should be `infra/kumdo-exam.caddy`).
+
+Studio convention is `infra/{project}.caddy` (matching the naming of `infra/{project}.service`). kumdo-exam was migrated with the file named simply `Caddyfile`. The new sudoers `cp` wildcard pattern is `/bin/cp /opt/*/?*/infra/*.caddy /etc/caddy/conf.d/*.caddy` — `Caddyfile` doesn't match because it lacks the `.caddy` extension.
+
+### Resolution
+
+**Date:** 2026-05-20 (logged; deferred to next kumdo-exam touch)
+**Change:** Rename `infra/Caddyfile` → `infra/kumdo-exam.caddy` in the kumdo-exam repo. Required before kumdo-exam's `deploy/run.sh` can be brought forward to include the canonical conditional Caddy sync step.
+**Status:** Deferred.
+
+---
+
+## Bug 18 — Legacy `deploy.sh` still in kumdo-exam's tree post-migration
+
+**Found:** 2026-05-20
+**Severity:** Very low. Operational cruft. Unused script that's not part of the studio convention.
+**Where:** `kumdo-exam` repo: `deploy.sh` at project root.
+
+The migration replaced `deploy.sh` with `deploy/run.sh` (a per-project script called by GitHub Actions). aqnas-xyz had its `deploy.sh` removed during migration; kumdo-exam's was left in place. Confusing for future readers who might wonder which is canonical.
+
+### Resolution
+
+**Date:** 2026-05-20 (logged; single-commit cleanup)
+**Change:** `git rm deploy.sh` in kumdo-exam repo. Single-commit chore.
+**Status:** Deferred.
+
+---
+
+## Bug 19 — aqnas-xyz's `deploy/run.sh` uses old `git pull` pattern
+
+**Found:** 2026-05-20
+**Severity:** Low. Works under normal circumstances. Fails the moment the server's state diverges from origin/main — `git pull` errors with merge conflicts and the deploy hangs. Same script also lacks `sg` group activation, so git internals occasionally create files owned `deploy:deploy` rather than `deploy:aqnas-xyz`.
+**Where:** `aqnas-xyz` repo: `deploy/run.sh` step 1.
+
+The canonical pattern (documented in chunk A's `deploy-procedure/SKILL.md` and embodied in chunk B's `project-scaffold/templates/deploy/run.sh`) is:
+
+```bash
+sg "{project}" -c "git fetch origin main && git reset --hard origin/main"
+```
+
+aqnas-xyz's actual `deploy/run.sh` still uses `git pull origin main` — the pre-canonical pattern from before the studio convention was finalized.
+
+Other minor canonical-template gaps in the same file:
+- Variables block at the top (`APP_DIR`, `SERVICE`, `PORT`, `HEALTH_PATH`, etc.) for consistency with the template
+- `uv sync --frozen --no-dev` instead of `uv sync --frozen` (production should skip dev deps)
+
+### Resolution
+
+**Date:** 2026-05-20 (logged; deferred to next aqnas-xyz touch)
+**Change:** Copy the canonical `deploy/run.sh` from `claude-config/skills/project-scaffold/templates/deploy/run.sh` (chunk B), substitute `{project-name}=aqnas-xyz` and `{port}=8011`. Verify Tailwind paths match (aqnas-xyz uses `app/static/src/input.css` → `app/static/style.css`, which is the canonical default).
+**Status:** Deferred.
+
+---
+
+## Bug 20 — Top-level `run.sh` divergence between projects
+
+**Found:** 2026-05-20
+**Severity:** Very low. Project-specific dev runners may legitimately diverge — this is logged for awareness, not because action is needed.
+**Where:** Both `aqnas-xyz` and `kumdo-exam` top-level `run.sh`.
+
+The canonical scaffold template from chunk B is:
+
+```bash
+if [[ -f "$TAILWIND_INPUT" ]]; then
+    tailwindcss --input "$TAILWIND_INPUT" --output "$TAILWIND_OUTPUT" --watch &
+    TW_PID=$!
+    trap 'kill $TW_PID 2>/dev/null' EXIT
+fi
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Actual content in production:
+
+- **aqnas-xyz**: starts Tailwind watcher (matches canonical structurally; doesn't have the file-existence guard); also exports `ADMIN_PASSWORD` default for dev convenience
+- **kumdo-exam**: no Tailwind watcher; has defensive "kill port 8000 if occupied" logic; binds `0.0.0.0` not `127.0.0.1`
+
+These differences are project-justified — aqnas-xyz needs an admin password env var, kumdo-exam wanted port-kill insurance. The scaffold provides a sensible default; projects diverge as their dev needs warrant.
+
+### Resolution
+
+**Date:** 2026-05-20 (logged for awareness; no action required)
+**Change:** None mandated. Optional: standardize on the canonical template if/when there's a reason. Project-specific divergence is acceptable in dev runners — they aren't load-bearing infrastructure and don't affect production behavior.
+**Status:** No action required.

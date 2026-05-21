@@ -2,9 +2,9 @@
 
 Server-side automation for AQNAS project hosting. Run on the production server, not on dev machines.
 
-## Two scripts, two layers
+## Three scripts, three layers
 
-These scripts split server work into two layers by frequency:
+These scripts split server work into three layers by frequency:
 
 ### Layer 2 — `init-server.sh` (once per server)
 
@@ -56,6 +56,29 @@ What the script does NOT do:
 - Add the DNS A record in Cloudflare (manual step in the dashboard)
 - Start the service (operator should verify `.env` is populated first)
 - Trigger CI/CD (operator pushes a commit to do that)
+
+### Layer 0 — `studio-status` (any time, read-only)
+
+A one-shot status query for all projects on the server. Reports per-project: systemd state + uptime, `/health` endpoint result, Caddy config drift between repo's `infra/` and `/etc/caddy/conf.d/`, last git commit. Also reports overall Caddy daemon status and port-registry-vs-listener alignment.
+
+Read-only — no sudo required for most checks. Safe to run any time, doesn't modify state.
+
+```sh
+./infrastructure/server/scripts/studio-status
+./infrastructure/server/scripts/studio-status --help
+```
+
+Suggested alias in `~/.bashrc`:
+
+```sh
+alias studio-status='~/aqnas-studio/infrastructure/server/scripts/studio-status'
+```
+
+Exit code is always 0 — `studio-status` is observational, not a CI gate. Grep the output for `⚠` or `✗` to detect issues programmatically:
+
+```sh
+studio-status | grep -E '(⚠|✗)' && echo "issues found" || echo "all green"
+```
 
 ## Typical first-deploy workflow
 
