@@ -533,3 +533,51 @@ These differences are project-justified — aqnas-xyz needs an admin password en
 **Date:** 2026-05-20 (logged for awareness; no action required)
 **Change:** None mandated. Optional: standardize on the canonical template if/when there's a reason. Project-specific divergence is acceptable in dev runners — they aren't load-bearing infrastructure and don't affect production behavior.
 **Status:** No action required.
+
+---
+
+## Bug 21 — Server-side aqnas-studio clone creates a soft drift risk
+
+**Found:** 2026-05-20 (mid-session realization during chunk E2)
+**Severity:** Low. No active impact today. Risk grows over time as the temptation to "just edit on the server" accumulates.
+**Where:** `~/aqnas-studio/` clone on aqnas-prod (Oracle).
+
+The studio repo is cloned on the production host at `~/aqnas-studio/` to make `bootstrap-project.sh` available when adding new projects. Bootstrap is a once-per-project event; outside of that, the server-side clone exists but isn't used in normal operations.
+
+This creates a soft drift risk: an operator SSHes in to debug something, makes a quick fix to a script, commits from the server (which works mechanically — the server has git, push access, etc.), and now there are two divergent histories until someone notices. The Bug 15 incident (Claude Code runtime state accidentally committed) is in a similar family — server-side state shouldn't be the canonical source.
+
+Initially the `studio-status` script (chunk E2) was designed to run on the server with the workflow:
+
+```sh
+ssh aqnas-prod
+cd ~/aqnas-studio
+git pull
+./infrastructure/server/scripts/studio-status
+```
+
+This would have amplified the drift risk by adding regular server-side `git pull`s into the workflow. Mid-session, the design was refactored: the script still lives canonically at `infrastructure/server/scripts/studio-status` in the studio repo, but invocation goes through a local wrapper at `scripts/studio-status` that streams the script over SSH and executes it remotely via `bash -s`. The server doesn't need a copy of aqnas-studio for status queries.
+
+### The broader pattern
+
+The same "stream over SSH" pattern can be applied to `bootstrap-project.sh` and `init-server.sh`:
+
+```sh
+# Hypothetical bootstrap pattern eliminating the server-side studio clone:
+ssh aqnas-prod 'sudo bash -s {project} {port} {domain}' \
+    < ~/aqnas-studio/infrastructure/server/scripts/bootstrap-project.sh \
+    hello-aqnas 8010 hello-aqnas.aqnas.xyz
+```
+
+If applied consistently, the server-side `~/aqnas-studio/` clone could be removed entirely. The studio repo would have a single canonical location (local + GitHub), and server-side execution would always be "stream the current script over SSH and run it."
+
+Concerns to think through before extending the pattern:
+- `bootstrap-project.sh` is interactive in places (prompts, confirmations) — would interactive prompts work over `bash -s`? Probably not without redesign.
+- `init-server.sh` is similar — interactive checks.
+- Some scripts may reference sibling files in the studio repo (e.g. sourcing helpers). Those references break when the script is streamed without its surrounding tree.
+- Recovery scenarios: if SSH is broken, having `bootstrap-project.sh` already on the server is a fallback. Streaming-only means recovery requires SSH.
+
+### Resolution
+
+**Date:** 2026-05-20 (partial — `studio-status` uses the new pattern; `bootstrap-project.sh` and `init-server.sh` do not)
+**Change (partial):** Added `scripts/studio-status` as a local wrapper. The server-side script is canonical in the repo at `infrastructure/server/scripts/studio-status`; the local wrapper streams and executes it via SSH stdin. README updated to make this the documented workflow.
+**Status:** Deferred — extending the pattern to `bootstrap-project.sh` and `init-server.sh`, and potentially removing the server-side studio clone, is its own architectural decision. The concerns above (interactivity, sibling file refs, recovery) need worked through first. Worth a focused session.

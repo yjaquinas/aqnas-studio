@@ -57,21 +57,23 @@ What the script does NOT do:
 - Start the service (operator should verify `.env` is populated first)
 - Trigger CI/CD (operator pushes a commit to do that)
 
-### Layer 0 — `studio-status` (any time, read-only)
+### Layer 0 — `studio-status` (any time, read-only, run from local)
 
 A one-shot status query for all projects on the server. Reports per-project: systemd state + uptime, `/health` endpoint result, Caddy config drift between repo's `infra/` and `/etc/caddy/conf.d/`, last git commit. Also reports overall Caddy daemon status and port-registry-vs-listener alignment.
 
-Read-only — no sudo required for most checks. Safe to run any time, doesn't modify state.
+Read-only — no state modified. Run from your **local machine** via the wrapper at `scripts/studio-status`. The wrapper streams the server-side script over SSH and executes it remotely:
 
 ```sh
-./infrastructure/server/scripts/studio-status
-./infrastructure/server/scripts/studio-status --help
+cd ~/aqnas-studio
+./scripts/studio-status
 ```
 
-Suggested alias in `~/.bashrc`:
+The server doesn't need a copy of aqnas-studio for this. The canonical script lives at `infrastructure/server/scripts/studio-status` in this repo; the wrapper streams it each invocation. No server-side `git pull` step, no drift risk from a server-side clone (see Bug 21 in `docs/findings.md` for context).
+
+Suggested alias in your **local** shell rc:
 
 ```sh
-alias studio-status='~/aqnas-studio/infrastructure/server/scripts/studio-status'
+alias studio-status='~/aqnas-studio/scripts/studio-status'
 ```
 
 Exit code is always 0 — `studio-status` is observational, not a CI gate. Grep the output for `⚠` or `✗` to detect issues programmatically:
@@ -79,6 +81,8 @@ Exit code is always 0 — `studio-status` is observational, not a CI gate. Grep 
 ```sh
 studio-status | grep -E '(⚠|✗)' && echo "issues found" || echo "all green"
 ```
+
+The server-side script honors `FORCE_COLOR=1` so colors survive the SSH pipe (the wrapper sets this automatically).
 
 ## Typical first-deploy workflow
 

@@ -1,0 +1,30 @@
+#!/bin/bash
+# scripts/studio-status — local wrapper for running studio-status on aqnas-prod.
+#
+# Streams the canonical infrastructure/server/scripts/studio-status script over
+# SSH and executes it remotely via `bash -s`. The server doesn't need a copy of
+# aqnas-studio for this — the script lives in the repo (local + GitHub) and is
+# streamed each time. Eliminates drift risk from a server-side studio clone.
+#
+# Usage:
+#   ./scripts/studio-status            # from studio root
+#   studio-status                      # if aliased (see infrastructure/server/scripts/README.md)
+#
+# Env overrides:
+#   AQNAS_PROD_HOST=aqnas-prod         # SSH host alias
+#
+set -euo pipefail
+
+STUDIO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT="$STUDIO_ROOT/infrastructure/server/scripts/studio-status"
+HOST="${AQNAS_PROD_HOST:-aqnas-prod}"
+
+if [[ ! -f "$SCRIPT" ]]; then
+    echo "FATAL: server-side studio-status not found at $SCRIPT" >&2
+    echo "Are you running this from a complete aqnas-studio checkout?" >&2
+    exit 1
+fi
+
+# FORCE_COLOR=1 keeps colors alive even though remote stdout is the SSH pipe.
+# The server-side script honors this env var.
+exec ssh "$HOST" 'FORCE_COLOR=1 bash -s' < "$SCRIPT"
