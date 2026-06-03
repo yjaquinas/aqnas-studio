@@ -177,3 +177,15 @@ aqnas-xyz and kumdo-exam top-level `run.sh` files diverged from the canonical te
 *2026-05-20 — partial resolution; broader pattern deferred*
 
 The `~/aqnas-studio/` clone on production exists only for `bootstrap-project.sh`. Outside that, it tempts operators to "just edit on the server" — soft drift risk. Mitigated for `studio-status` by adding a local wrapper at `scripts/studio-status` that streams the script over SSH via `bash -s`; the server doesn't need a copy. The same pattern could extend to `bootstrap-project.sh` and `init-server.sh`, then remove the server-side clone entirely. Open concerns: interactive prompts under `bash -s`, sibling-file references, recovery scenarios when SSH is broken. Worth a focused session.
+
+---
+
+### Bug 22 — kumdo-exam uses project-specific "live is source of truth" Caddy model
+
+*2026-06-03 — accepted as documented divergence*
+
+kumdo-exam's `infra/kumdo-exam.caddy` is reference-only documentation, not a sync source — the file's 29-line header articulates this. Live `/etc/caddy/conf.d/kumdo-exam.caddy` is source of truth because Cloudflare's IP ranges (used in the live config's `trusted_proxies` block for correct real-IP logging, geolocation, rate limiting) drift every ~6 months; hardcoding them in the repo means the repo is always stale.
+
+Consequence: kumdo-exam's `deploy/run.sh` deliberately omits Caddy auto-sync. `studio-status` will report drift between repo and live — expected, not a bug. The studio's canonical pattern (repo → live, auto-synced by `deploy/run.sh`) is right for most projects; kumdo-exam diverges with reason.
+
+Discovered when `studio-status` first showed the drift after Bug 17's rename. Stale port in the repo file (8001 → 8012, post-migration drift) was fixed separately as a documentation-alignment commit on the same day.
