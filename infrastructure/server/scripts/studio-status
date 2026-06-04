@@ -43,10 +43,12 @@ hdr()   { printf "\n${B}%s${N}\n" "$*"; }
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
-# Output "project=port" lines from ports.conf, skipping comments and blanks
+# Output "project=port" lines from ports.conf, skipping comments and blanks.
+# Sorted numerically by port number (after =) so display order is stable
+# regardless of how entries are arranged in the file.
 read_ports() {
     [[ -f "$PORTS_CONF" ]] || return 0
-    grep -vE '^\s*(#|$)' "$PORTS_CONF" 2>/dev/null | tr -d ' '
+    grep -vE '^\s*(#|$)' "$PORTS_CONF" 2>/dev/null | tr -d ' ' | sort -t= -k2 -n
 }
 
 # Extract the domain(s) from a Caddy config file's first non-comment line.
