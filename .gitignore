@@ -18,6 +18,10 @@ claude-config/__store.db*
 claude-config/todos/
 claude-config/statsig/
 claude-config/ide/
+claude-config/sessions/
+claude-config/shell-snapshots/
+claude-config/.last-cleanup
+claude-config/.last-update-result.json
 
 # Operational state — your real port allocations stay private
 # The .example template ships in the repo

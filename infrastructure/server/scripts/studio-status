@@ -6,9 +6,14 @@
 # config drift between repo's infra/ and /etc/caddy/conf.d/, last git commit.
 # Also reports overall Caddy daemon status and port-registry-vs-listener alignment.
 #
-# Run on the production host. Most checks are read-only and work without sudo.
-# Suggested alias for convenience:
-#   alias studio-status='~/aqnas-studio/infrastructure/server/scripts/studio-status'
+# This is the canonical script. It executes on the production host, but you do
+# not run it there directly. Invoke the local wrapper `scripts/studio-status`,
+# which streams this file over SSH (bash -s). The server keeps no copy of
+# aqnas-studio, which is what avoids server-side drift (see Bug 21 in
+# docs/findings.md). Most checks are read-only and need no sudo.
+#
+# Suggested alias (points at the wrapper, not this file):
+#   alias studio-status='~/aqnas-studio/scripts/studio-status'
 #
 # Exit code is always 0 — this is a status tool, not a CI gate. Grep the output
 # for "⚠" or "✗" to detect issues programmatically.
