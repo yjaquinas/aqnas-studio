@@ -210,14 +210,20 @@ fi
 # ============================================================
 step "7/13 Adding git safe.directory exceptions..."
 # ============================================================
-# Without these, git refuses to operate with "dubious ownership". The .git/
+# Without this, git refuses to operate with "dubious ownership". The .git/
 # directory ends up owned by deploy:{project} due to setgid, but neither deploy
 # nor the service user is the strict owner of every file (CVE-2022-24765 check).
 # Both need the exception:
 #   - deploy: runs git fetch + reset --hard via deploy/run.sh on every deploy
 #   - service user: any manual `sudo -u {project} git ...` operation needs it too
-run "sudo -u deploy git config --global --add safe.directory '$REPO_DIR'"
-run "sudo -u '$PROJECT' git config --global --add safe.directory '$REPO_DIR'"
+#
+# Use --system (writes /etc/gitconfig) rather than per-user --global. The service
+# user is created with --no-create-home, so its $HOME is /nonexistent and
+# `git config --global` fails with "could not lock config file
+# /nonexistent/.gitconfig". A single system-wide entry covers every user that
+# touches this repo, with no dependency on per-user home directories. We're
+# already running as root here (via sudo), so /etc/gitconfig is writable.
+run "git config --system --add safe.directory '$REPO_DIR'"
 
 # ============================================================
 step "8/13 Generating stub .env..."
