@@ -135,6 +135,16 @@ sudo deluser {project}
 # Now safe to re-run bootstrap-project.sh
 ```
 
+### "failed to stat '…': Permission denied" at step 7
+
+Step 7 (`git config --global --add safe.directory`) runs as `sudo -u deploy` /
+`sudo -u {project}`, and git does repository discovery on its inherited cwd at
+startup. If you launched the script from a directory those users can't traverse
+— e.g. `~/aqnas-studio` under `/home/ubuntu` (mode 750) — git aborts before
+writing the config. The script now `cd /` internally to avoid this, so it's
+runnable from any directory. If you're on an older copy that predates that fix,
+either `cd /` before invoking it or run it by absolute path from `/`.
+
 ## Why these scripts and not just `deploy-procedure/SKILL.md`?
 
 The skill body documents the *what* and *why* — what each step does, why we own things this way, what the failure modes are. That's reference material for understanding.

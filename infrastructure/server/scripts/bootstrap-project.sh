@@ -108,6 +108,17 @@ fi
 
 ok "Studio root: $STUDIO_ROOT"
 
+# ---- move to a neutral working directory ----
+# Everything below uses absolute paths (PROJECT_DIR, REPO_DIR) or BASH_SOURCE-
+# derived paths, so cwd is irrelevant to this script's own logic. But the
+# per-user subcommands we spawn (e.g. `sudo -u deploy git config ...`) inherit
+# this cwd, and git runs repository discovery on startup. If we were launched
+# from a dir those users can't traverse (e.g. /home/ubuntu/aqnas-studio, mode
+# 750), git aborts with "failed to stat ...: Permission denied" before doing
+# anything. Anchoring to / (world-traversable) makes the script runnable from
+# any directory.
+cd /
+
 PROJECT_DIR="/opt/$PROJECT"
 REPO_DIR="$PROJECT_DIR/$PROJECT"
 
