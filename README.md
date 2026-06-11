@@ -210,6 +210,15 @@ git pull
 
 Changes take effect next time you start Claude Code.
 
+## Licensing
+
+Default for sellable AQNAS SaaS products: proprietary, "All rights reserved"
+copyright notice (`LICENSE` + a one-line README pointer) — see
+[mushin/LICENSE](https://github.com/yjaquinas/mushin/blob/main/LICENSE) as the
+template. Reusable libraries intended for external adoption may use MIT/Apache
+on a per-repo basis with explicit reasoning. Internal infra/config repos (e.g.
+this one) stay private or all-rights-reserved by default.
+
 ## More detail
 
 - `claude-config/CLAUDE.md` — the studio's operating principle and full stack defaults
