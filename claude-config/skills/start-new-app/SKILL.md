@@ -38,7 +38,7 @@ Before writing anything to the cwd, verify all of these:
 1. **`$AQNAS_STUDIO_ROOT` is set.** If not, abort with: "AQNAS_STUDIO_ROOT is not set. Run `~/aqnas-studio/setup.sh` (or the equivalent) and reload your shell, then retry."
 2. **cwd state.** Categorize the cwd into one of five cases below; act per the case.
 3. **Project name validity.** `basename $(pwd)` should be kebab-case (lowercase letters, digits, hyphens; must start with a letter; no `aqnas-` prefix). If not, prompt for a name; warn that the directory name and project name will differ.
-4. **Tools.** `uv` and `git` must be on the PATH. `gitleaks` is checked but its absence is non-fatal (the pre-commit hook will warn at commit time instead of failing here).
+4. **Tools.** `uv` and `git` must be on the PATH. `gitleaks` and `node`/`npx` are checked but their absence is non-fatal: a missing `gitleaks` means the pre-commit hook will warn at commit time instead of failing here; a missing `node`/`npx` means Step 6's `playwright-cli` skill install is skipped (noted in the final report) and the CEO can run it later.
 
 ## Step 1 — Categorize the cwd
 
@@ -181,6 +181,14 @@ UV_CACHE_DIR=./.uv-cache uv sync
 This generates `uv.lock` and creates `.venv/`. Both are project-local; `.uv-cache/` mirrors the production layout where systemd sets `UV_CACHE_DIR=/opt/{project}/.uv-cache`.
 
 **On failure:** report the failure with the captured stderr but **do not roll back the scaffold**. Partial state is recoverable; rolling back deleted files is risky. Continue to step 7. Mark `uv sync` status in the final report.
+
+Also install the `playwright-cli` skill for E2E tests:
+
+```bash
+npx -y @playwright/cli@latest install --skills=claude
+```
+
+This writes `.claude/skills/playwright-cli/` (skill + references, ready to commit) and an empty `.playwright/` (session/snapshot data, gitignored). It reuses an installed system browser when one is found instead of downloading a bundled Chromium. Non-fatal on failure — note it in the final report and the CEO can rerun the command later.
 
 ## Step 7 — Initial commit
 

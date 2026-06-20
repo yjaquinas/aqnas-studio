@@ -2,7 +2,7 @@
 name: analyze-webpage
 description: Fetches and analyzes a webpage for design patterns, copywriting, information architecture, and technical implementation signals, returning a structured report covering palette, typography, spacing, layout, interaction patterns, copy voice, and technical stack guesses. Use when the user shares a URL and asks to analyze, break down, study, or extract patterns from it; when referencing a competitor or inspiration site during a meeting; or when the user asks "what do you think of {url}". Read-only — never submits forms, follows links beyond the initial URL, or stores credentials.
 argument-hint: <url>
-allowed-tools: WebFetch, Read, Write
+allowed-tools: WebFetch, Read, Write, Bash(playwright-cli:*), Bash(npx:*)
 ---
 
 # /analyze-webpage
@@ -29,15 +29,21 @@ Do not auto-invoke for:
 
 ## Step 1 — Fetch and render
 
-Use Playwright MCP if available (it's the default for AQNAS — see infrastructure MCP list). Capture:
+Use the `playwright-cli` skill if available (it's the default for AQNAS):
 
-1. Full-page screenshot (not just viewport)
-2. Rendered HTML snapshot (after JS execution)
-3. Computed styles for the first 30 visible elements
-4. Network request summary (domains, asset types)
-5. Any console errors or warnings
+```bash
+playwright-cli open {url}
+playwright-cli screenshot --filename=page.png
+playwright-cli snapshot --filename=page.yml
+playwright-cli eval "[...document.querySelectorAll('*')].slice(0,30).map(el => getComputedStyle(el).cssText)"
+playwright-cli requests
+playwright-cli console
+playwright-cli close
+```
 
-If Playwright MCP is unavailable, fall back to `WebFetch` for HTML + links only, and note in the report that visual analysis is limited.
+Capture: full-page screenshot, rendered HTML/accessibility snapshot (after JS execution), computed styles for the first 30 visible elements, network request summary (domains, asset types), and any console errors or warnings. Read the saved snapshot/screenshot files rather than expecting them inline.
+
+If `playwright-cli` is unavailable, fall back to `WebFetch` for HTML + links only, and note in the report that visual analysis is limited.
 
 ## Step 2 — Extract design tokens
 
@@ -143,7 +149,7 @@ The last section is the point — everything else is setup.
 
 ## Failure modes
 
-- **Playwright MCP unavailable.** Fall back to WebFetch, note the limitation in the report.
+- **`playwright-cli` unavailable.** Fall back to WebFetch, note the limitation in the report.
 - **Paywall or login wall.** Report what's visible; don't attempt auth.
 - **JS-heavy SPA that doesn't render content in HTML.** Playwright handles this; WebFetch does not. Flag the mismatch if you had to fall back.
 - **Site blocked or 404.** Report and stop. Don't retry aggressively.

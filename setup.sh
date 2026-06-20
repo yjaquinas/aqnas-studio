@@ -236,6 +236,7 @@ check_tool() {
 check_tool git      "likely already installed; if not: brew install git (macOS) or sudo apt install git (Ubuntu)"
 check_tool uv       "install: curl -LsSf https://astral.sh/uv/install.sh | sh"
 check_tool claude   "install: https://docs.claude.com/en/docs/claude-code"
+check_tool node     "install: https://nodejs.org or brew install node (macOS) / sudo apt install nodejs npm (Ubuntu)"
 check_tool gitleaks "install: brew install gitleaks (macOS) or sudo apt install gitleaks (Ubuntu)"
 
 # -------- summary --------

@@ -21,6 +21,7 @@ Designed to run on **macOS** or **Linux (Ubuntu 24.04 or similar)**. The product
 | **Claude Code** | Follow https://docs.claude.com/en/docs/claude-code |
 | **git** | macOS: `brew install git` · Ubuntu: `sudo apt install git` |
 | **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Node.js** (npm/npx) | macOS: `brew install node` · Ubuntu: `sudo apt install nodejs npm` · or https://nodejs.org |
 | **gitleaks** | macOS: `brew install gitleaks` · Ubuntu: `sudo apt install gitleaks` |
 
 ### 2. Clone the repo

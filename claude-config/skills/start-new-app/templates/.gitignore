@@ -39,6 +39,10 @@ htmlcov/
 .tox/
 .nox/
 
+# playwright-cli session/snapshot data
+.playwright/
+.playwright-cli/
+
 # IDE
 .vscode/
 .idea/

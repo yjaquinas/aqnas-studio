@@ -30,7 +30,7 @@ The skill prompts you to confirm:
 - Display name (default: title-cased directory name)
 - Domain (default: `<project>.aqnas.xyz`)
 
-Then it allocates a port from the studio registry, populates the directory with the canonical scaffold, runs `uv sync`, installs the gitleaks pre-commit hook, and makes the initial commit.
+Then it allocates a port from the studio registry, populates the directory with the canonical scaffold, runs `uv sync`, installs the `playwright-cli` skill for E2E testing, installs the gitleaks pre-commit hook, and makes the initial commit.
 
 ## 2. Verify locally
 

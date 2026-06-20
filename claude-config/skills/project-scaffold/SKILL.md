@@ -47,7 +47,7 @@ Canonical AQNAS project layout.
 │   ├── conftest.py
 │   ├── unit/
 │   ├── integration/
-│   └── e2e/                     # Playwright via MCP
+│   └── e2e/                     # Playwright via the playwright-cli skill
 ├── deploy/
 │   └── run.sh                   # deploy entry point — called by GitHub Actions
 ├── infra/
@@ -62,7 +62,7 @@ Canonical AQNAS project layout.
 ├── .claude/
 │   ├── CLAUDE.md                # project-level Claude Code rules (loaded by Claude Code automatically)
 │   ├── agents/                  # populated as TF agents are defined
-│   ├── skills/                  # populated as project-scope skills are defined
+│   ├── skills/                  # populated as project-scope skills are defined; playwright-cli installed by /start-new-app
 │   └── rules/                   # 5 path-scoped/repo-wide rule skeletons
 ├── CLAUDE.md                    # root-level — project Claude Code context (distinct from .claude/CLAUDE.md)
 ├── DEVELOPER_GUIDE.md           # human-readable developer reference
@@ -130,7 +130,7 @@ A cheat sheet for when the CEO or an agent asks "where does X live?":
 | Tailwind input | `app/static/src/input.css` (output `app/static/style.css` is gitignored) |
 | New static asset | `app/static/{js,img}/` |
 | pytest test | `tests/{unit,integration,e2e}/test_{name}.py` |
-| Playwright test | `tests/e2e/test_{name}.py` (runs via Playwright MCP) |
+| Playwright test | `tests/e2e/test_{name}.py` (runs via the `playwright-cli` skill) |
 | New skill (project scope) | `.claude/skills/{name}/SKILL.md` |
 | New rule (project scope) | `.claude/rules/{name}.md` with `paths:` frontmatter |
 | Meeting output | `meetings/MEETING-YYYY-MM-DD-{slug}/` |
@@ -164,7 +164,7 @@ Ready to copy from `${CLAUDE_SKILL_DIR}/templates/`:
 - `.claude/rules/python-backend.md` — path-scoped to `app/**` and `tests/**`: uv-run invocation, import conventions, SQLite patterns, ruff
 - `.claude/rules/web-templates.md` — path-scoped to `app/templates/web/**`, `app/templates/components/**`, `app/static/**`: HTMX-first, Tailwind v4, Alpine as fallback, accessibility baseline
 - `.claude/rules/mobile-templates.md` — path-scoped to `app/templates/mobile/**`, `mobile-client/**`: Hyperview/HXML conventions, `/m/` routing, Content-Type requirements
-- `.claude/rules/tests.md` — path-scoped to `tests/**`: layout, naming, pytest + Playwright MCP patterns
+- `.claude/rules/tests.md` — path-scoped to `tests/**`: layout, naming, pytest + `playwright-cli` patterns
 - `.claude/rules/repo-wide.md` — always-loaded (no `paths:`): secret hygiene, git hygiene, destructive-action caution
 
 (`.env.example` and `.gitignore` live in the `start-new-app` skill's own templates — that's where they're used.)
