@@ -22,6 +22,16 @@ claude-config/sessions/
 claude-config/shell-snapshots/
 claude-config/.last-cleanup
 claude-config/.last-update-result.json
+claude-config/daemon.lock
+claude-config/daemon.log
+claude-config/daemon.status.json
+claude-config/daemon/
+claude-config/debug/
+claude-config/jobs/
+claude-config/paste-cache/
+claude-config/plans/
+claude-config/tasks/
+claude-config/stats-cache.json
 
 # Operational state — your real port allocations stay private
 # The .example template ships in the repo
@@ -57,3 +67,5 @@ __pycache__/
 
 # Node (in case mobile tooling runs here)
 node_modules/
+new-features.txt
+todo.txt
