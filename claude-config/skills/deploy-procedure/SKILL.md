@@ -14,6 +14,7 @@ Deploy to the Ubuntu 24.04 production host.
 Run once per project. Done on the server, automated by `bootstrap-project.sh`.
 
 Prerequisites:
+
 - `start-new-app` has scaffolded the repo locally and the operator pushed it to GitHub
 - The server has been initialized via `init-server.sh` (one-time per server)
 - Port is reserved in `infrastructure/server/ports.conf` (locally) — `bootstrap-project.sh` syncs this to the server's `/etc/caddy/ports.conf`
@@ -47,6 +48,7 @@ The script executes a 13-step sequence:
 13. Runs first `uv sync` as deploy
 
 After the script completes, the operator manually:
+
 - Edits `/opt/{project}/.env` with real values
 - Adds the DNS A record in Cloudflare
 - Starts the service: `sudo systemctl start {project}`
@@ -56,6 +58,7 @@ After the script completes, the operator manually:
 The script refuses to run if the project user, dir, or port already exist — partial-state recovery is an explicit operator decision (see `scripts/README.md` for the cleanup commands).
 
 For the script to work, the server must already have:
+
 - `init-server.sh` completed (gives `deploy` the right sudoers permissions)
 - `uv`, `git`, `caddy`, and `gitleaks` on PATH
 - `deploy` user with SSH key registered on GitHub (account-level or per-repo)
@@ -114,8 +117,8 @@ Each project's repo has two infrastructure-related directories:
 
 The split is by intent:
 
-- `deploy/` — what's actively *run* during deploy. Currently just `run.sh`. The CI workflow calls this; nothing else goes here.
-- `infra/` — declarative *configuration* that lives in `/etc/` on the server (systemd unit, Caddy config). Plus optional per-project operational scripts (backup, hardening, OrbStack staging, etc.) that belong with the project but aren't part of the deploy entry point.
+- `deploy/` — what's actively _run_ during deploy. Currently just `run.sh`. The CI workflow calls this; nothing else goes here.
+- `infra/` — declarative _configuration_ that lives in `/etc/` on the server (systemd unit, Caddy config). Plus optional per-project operational scripts (backup, hardening, OrbStack staging, etc.) that belong with the project but aren't part of the deploy entry point.
 
 `bootstrap-project.sh` reads from `infra/` to install the systemd unit and Caddy config. `deploy/run.sh` reads from `infra/{project}.caddy` to optionally re-sync Caddy on each deploy when it changes.
 
@@ -123,13 +126,13 @@ The split is by intent:
 
 The service user (`{project}`) is the owner of record for everything in `/opt/{project}/`. It runs the uvicorn process, owns `.env`, and is the primary write identity. The `deploy` user is a CI/CD actor only — it gets write access to `{project}/` (the repo) and `.uv-cache/` via **group membership**, not ownership.
 
-| Path | Owner | Group | Mode | Why |
-|---|---|---|---|---|
-| `/opt/{project}/` | `{project}` | `{project}` | 755 | Service user is the root owner |
+| Path                        | Owner       | Group       | Mode | Why                                                                                                     |
+| --------------------------- | ----------- | ----------- | ---- | ------------------------------------------------------------------------------------------------------- |
+| `/opt/{project}/`           | `{project}` | `{project}` | 755  | Service user is the root owner                                                                          |
 | `/opt/{project}/{project}/` | `{project}` | `{project}` | 2775 | The repo clone — group-writable (deploy can git operate) + setgid (new files inherit `{project}` group) |
-| `/opt/{project}/data/` | `{project}` | `{project}` | 755 | Service user writes SQLite + uploads |
-| `/opt/{project}/.uv-cache/` | `{project}` | `{project}` | 2775 | Group-writable + setgid (deploy writes during sync, service reads) |
-| `/opt/{project}/.env` | `{project}` | `{project}` | 600 | Secrets — deploy cannot read |
+| `/opt/{project}/data/`      | `{project}` | `{project}` | 755  | Service user writes SQLite + uploads                                                                    |
+| `/opt/{project}/.uv-cache/` | `{project}` | `{project}` | 2775 | Group-writable + setgid (deploy writes during sync, service reads)                                      |
+| `/opt/{project}/.env`       | `{project}` | `{project}` | 600  | Secrets — deploy cannot read                                                                            |
 
 After deploy runs git or uv sync, the touched files will be owned by `deploy:{project}` (owner is the runner, group inherits via setgid + `sg`). That's acceptable — the service user has group read access either way.
 
@@ -193,6 +196,7 @@ If you're setting up a server manually and need to install this without `init-se
 `systemctl restart {project}` is **not** truly zero-downtime — there's a brief window (usually under a second) where the service is down. For AQNAS's current traffic, this is fine.
 
 For actual zero-downtime, the paths are:
+
 - Run two workers behind Caddy's load balancer, rolling-restart them
 - Use `systemctl reload` if the service supports SIGHUP-reload
 
@@ -247,6 +251,7 @@ This triggers a clean deploy of the reverted state and keeps history honest.
 - **Health check times out.** Service didn't start or isn't binding the port. `sudo journalctl -u {project} -n 100` on the server.
 - **`git fetch` or `git reset --hard` fails in CI with "dubious ownership".** Missing safe.directory exception for deploy. Fix with `sudo -u deploy git config --global --add safe.directory /opt/{project}/{project}`. `bootstrap-project.sh` does this in step 7; if you bootstrapped manually or with an older version of the script, run it now.
 - **`uv sync` fails.** `pyproject.toml` change that needs a system dep, or `uv.lock` is out of date. Run locally first and commit the updated lock.
+- **Build step fails with `EACCES: permission denied` on a gitignored output file.** Common with Tailwind's `app/static/style.css` or other build artifacts. The file persists from a previous deploy (gitignored, so `git reset --hard` doesn't touch it) and was created with mode 644 by a different owner or umask, so the current `deploy` user can't overwrite it even though it's in the project group. Immediate fix: `ssh aqnas-prod "sudo rm -f /opt/{project}/{project}/<path-to-stale-file>"` and retry the deploy. Permanent fix: ensure `umask 002` is set near the top of `deploy/run.sh` (the canonical `project-scaffold` template includes it) so files created during deploys are group-writable (664) instead of owner-only (644).
 - **`systemctl restart` fails with "password required" in CI.** The `deploy` user's sudoers entry is missing. Check `/etc/sudoers.d/aqnas-studio-deploy` (the file `init-server.sh` installs).
 - **Caddy `cp` step in `deploy/run.sh` fails with permission error.** The sudoers `cp` wildcard isn't installed or your project's path doesn't match. The wildcard pattern is `/opt/*/?*/infra/*.caddy /etc/caddy/conf.d/*.caddy` — verify your project's path matches. Older per-project `cp` entries also work but the wildcard is preferred.
 - **Caddy reload fails after a `.caddy` config change.** `systemctl reload caddy` validates the new config internally before applying it — if reload fails, the new config didn't pass validation. Check `journalctl -u caddy -n 30` for the specific error. Common cause: TLS DNS challenge failure (Cloudflare token missing or wrong permissions). The previous config keeps running, so existing sites stay up.

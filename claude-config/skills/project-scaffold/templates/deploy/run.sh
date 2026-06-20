@@ -3,6 +3,14 @@
 # Called by GitHub Actions via SSH or manually on the server.
 set -euo pipefail
 
+# Group-friendly umask: created files are 664, directories 775.
+# Required so subsequent deploys (running as `deploy`, member of the
+# {project-name} group) can overwrite files this deploy creates.
+# Default umask 022 produces 644 files that only the original owner
+# can rewrite — which breaks gitignored build artifacts like Tailwind's
+# style.css on the second deploy.
+umask 002
+
 export PATH="$HOME/.local/bin:$PATH"
 
 # ── Project config — edit these for your project ──────────────────────
