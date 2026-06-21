@@ -1,6 +1,6 @@
 ---
 name: commit-git
-description: Reviews staged and unstaged changes, runs gitleaks explicitly to scan for secrets before committing (defense in depth alongside the pre-commit hook), groups related changes into logical commits, and generates a conventional commit message. Refuses to commit if secrets are detected, if forbidden files are staged (.env, SSH keys, .key, .pem, credentials.json, or files containing production server IPs), or with --no-verify.
+description: Reviews staged and unstaged changes, runs gitleaks explicitly to scan for secrets before committing (defense in depth alongside the pre-commit hook), groups related changes into logical commits, and generates one-line conventional commit messages (with optional parenthetical reference). Refuses to commit if secrets are detected, if forbidden files are staged (.env, SSH keys, .key, .pem, credentials.json, or files containing production server IPs), or with --no-verify.
 disable-model-invocation: true
 argument-hint: [optional-message-hint]
 allowed-tools: Bash(git:*), Bash(gitleaks:*), Read, Grep
@@ -75,14 +75,10 @@ Examine the staged diff. Decide whether this is one commit or several:
 - **One commit** — all changes serve one purpose (one feature, one fix, one refactor)
 - **Several commits** — changes touch unrelated concerns (fix + new feature, or refactor + bug fix). Offer to split.
 
-For each commit, generate a **conventional commit** message:
+For each commit, generate a **conventional commit** message — one line subject only:
 
 ```
 <type>(<scope>): <short subject>
-
-<body — optional, wraps at 72 cols, explains "why">
-
-<footer — optional, e.g., "Refs MEETING-2026-04-16-user-auth">
 ```
 
 Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`, `build`, `ci`, `perf`.
@@ -91,11 +87,19 @@ Scope examples: `auth`, `web`, `mobile`, `deploy`, `infra`, `brand`.
 
 Subject rules:
 - Imperative mood ("add", not "added" or "adds")
-- Under 72 characters
+- Under 72 characters (one line, no body)
 - No trailing period
 - Lowercase start (except proper nouns)
 
 If the CEO gave a hint in `$ARGUMENTS`, incorporate it.
+
+**Optional short description:** If context warrants (e.g., references a meeting or external ticket), append a brief parenthetical note on the same line, keeping total under 100 characters:
+
+```
+feat(auth): add email/password login (refs MEETING-2026-04-16-user-auth)
+```
+
+Prefer one-liners. Only add a parenthetical when it clarifies provenance or dependency.
 
 ## Step 5 — Confirm
 
@@ -109,12 +113,7 @@ STAGED FILES ({N}):
 
 MESSAGE:
 
-feat(auth): add email/password login with session cookies
-
-Adds POST /login handler, session middleware, and HTMX-compatible
-error fragment. Sessions are stored in SQLite with a 14-day TTL.
-
-Refs MEETING-2026-04-16-user-auth
+feat(auth): add email/password login with session cookies (refs MEETING-2026-04-16-user-auth)
 
 Commit? (y / edit / abort)
 ```
